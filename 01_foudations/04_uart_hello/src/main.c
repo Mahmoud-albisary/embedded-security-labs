@@ -18,29 +18,6 @@
 
 
 #define GPIO_PORTA_CLOCK_EN (1U << 0)
-// #define GPIO_PORTF_LOCK_KEY 0x4C4F434B
-// #define SW1_BUTTON          (1U << 4)
-// #define SW2_BUTTON          (1U << 0)
-// #define RED_LED             (1U << 1)
-// #define BLUE_LED            (1U << 2)
-// #define GREEN_LED           (1U << 3)
-// #define PURPLE_LED          (RED_LED | BLUE_LED)
-// #define YELLOW_LED          (RED_LED | GREEN_LED)
-// #define CYAN_LED            (BLUE_LED | GREEN_LED)
-// #define WHITE_LED           (RED_LED | BLUE_LED | GREEN_LED)
-// #define NUM_LEDS            7
-
-
-// const uint32_t leds[] = {
-//     RED_LED,
-//     BLUE_LED,
-//     GREEN_LED,
-//     PURPLE_LED,
-//     YELLOW_LED,
-//     CYAN_LED,
-//     WHITE_LED
-// };
-
 
 int main(void) {
     SYSCTL_RCGCGPIO_R |= GPIO_PORTA_CLOCK_EN;
