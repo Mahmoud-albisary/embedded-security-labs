@@ -1,0 +1,36 @@
+name: Firmware CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-foundation-labs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi make
+
+      - name: Build 01_blink_baremetal
+        run: make
+        working-directory: 01_foudations/01_blink_baremetal
+
+      - name: Build 02_gpio_multi_led
+        run: make
+        working-directory: 01_foudations/02_gpio_multi_led
+
+      - name: Build 03_button_leds
+        run: make
+        working-directory: 01_foudations/03_button_leds
+
+      - name: Build 04_uart_hello
+        run: make
+        working-directory: 01_foudations/04_uart_hello
