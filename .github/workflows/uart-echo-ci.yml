@@ -1,0 +1,50 @@
+name: UART Echo CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/uart-echo-ci.yml"
+      - "02_firmware_interaction/01_uart_echo/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/uart-echo-ci.yml"
+      - "02_firmware_interaction/01_uart_echo/**"
+  workflow_dispatch:
+
+jobs:
+  build-uart-echo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi \
+            gcc-arm-none-eabi \
+            make
+
+      - name: Build firmware
+        run: make clean all
+        working-directory: 02_firmware_interaction/01_uart_echo
+
+      - name: Show firmware outputs
+        run: ls -lh uart_echo.elf uart_echo.bin uart_echo.map
+        working-directory: 02_firmware_interaction/01_uart_echo
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: uart-echo-firmware
+          path: |
+            02_firmware_interaction/01_uart_echo/uart_echo.elf
+            02_firmware_interaction/01_uart_echo/uart_echo.bin
+            02_firmware_interaction/01_uart_echo/uart_echo.map
+          if-no-files-found: error
+          retention-days: 7
