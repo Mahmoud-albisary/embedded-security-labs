@@ -20,8 +20,58 @@ void foo() {
 //     volatile uint32_t c = 0xCCCCCCCC;
 //     bar(); // This will cause a stack overflow due to infinite recursion
 // }
-int main() {
-    foo();
+
+volatile uint32_t observation;
+
+__attribute__((noinline))
+
+static void helper(void)
+{
+    observation++;
+}
+
+__attribute__((noinline))
+
+static void vulnerable(void)
+{
+    volatile uint32_t buffer[10];
+    buffer[0] = 0;
+
+    helper();  /* Forces vulnerable() to preserve its own return address. */
+    buffer[11] = ((uint32_t)(uintptr_t)&blink) | 1U;  /* This will cause a stack overflow, overwriting the return address. */
+    /*
+     * Initially leave all out-of-bounds writes disabled.
+     * First inspect the generated frame using GDB.
+     */
+    __asm volatile ("nop");
+}
+
+static void delay(void) {
+    for (volatile uint32_t i = 0; i < 1000000; i++) {
+    }
+}
+
+static void blink(void) {
+    SYSCTL_RCGCGPIO_R |= GPIO_PORTF_CLOCK_EN;
+        /* Wait until Port F is reported ready before accessing its registers. */
+    while ((SYSCTL_PRGPIO_R & GPIO_PORTF_CLOCK_EN) == 0U) {
+    }
+
+    // Small delay after enabling peripheral clock
+    volatile uint32_t dummy = SYSCTL_RCGCGPIO_R;
+    (void)dummy;
+
+    GPIO_PORTF_DIR_R |= RED_LED;
+    GPIO_PORTF_DEN_R |= RED_LED;
+
+    while (1) {
+        GPIO_PORTF_DATA_R ^= RED_LED;
+        delay();
+    }
+}
+
+int main(void) {
+    vulnerable();
     //bar();
     return 0;
 }
