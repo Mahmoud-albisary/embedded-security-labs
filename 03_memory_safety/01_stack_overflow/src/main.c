@@ -1,5 +1,15 @@
 #include <stdint.h>
 
+#define SYSCTL_RCGCGPIO_R   (*((volatile uint32_t *)0x400FE608))
+#define SYSCTL_PRGPIO_R     (*((volatile uint32_t *)0x400FEA08))
+#define GPIO_PORTF_DIR_R    (*((volatile uint32_t *)0x40025400))
+#define GPIO_PORTF_DEN_R    (*((volatile uint32_t *)0x4002551C))
+#define GPIO_PORTF_DATA_R   (*((volatile uint32_t *)0x400253FC))
+
+#define GPIO_PORTF_CLOCK_EN (1U << 5)
+#define RED_LED             (1U << 1)
+
+static void blink(void);
 void foo() {
     volatile uint32_t a = 0xAAAAAAAA;
     volatile uint32_t buffer[10];
