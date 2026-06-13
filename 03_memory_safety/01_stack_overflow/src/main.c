@@ -24,7 +24,7 @@ void foo() {
     while(1);
 }
 
-// Do not run this function, as it will cause a stack overflow due to infinite recursion and may cause damage to the RAM. 
+// Do not run this function, as it will cause a stack overflow due to infinite recursion. 
 // Uncommenting this function and calling it will lead to a stack overflow, which can cause the program to crash or behave unpredictably.
 // void bar() {
 //     volatile uint32_t c = 0xCCCCCCCC;
