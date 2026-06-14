@@ -48,7 +48,7 @@ static void vulnerable(void)
     buffer[0] = 0;
 
     helper();  /* Forces vulnerable() to preserve its own return address. */
-    buffer[11] = ((uint32_t)(uintptr_t)&blink) | 1U;  /* This will cause a stack overflow, overwriting the return address. */
+    buffer[11] = 0xA1;  // ((uint32_t)(uintptr_t)&blink) | 1U; /* This will cause a stack overflow, overwriting the return address. */
     /*
      * Initially leave all out-of-bounds writes disabled.
      * First inspect the generated frame using GDB.
