@@ -185,7 +185,15 @@ static void blink(void) {
 }
 
 int main(void) {
-    vulnerable();
+    SYSCTL_RCGCGPIO_R |= GPIO_PORTA_CLOCK_EN | GPIO_PORTF_CLOCK_EN;
+    SYSCTL_RCGCUART_R |= UART0_CLOCK_EN;
+
+    while ((SYSCTL_PRGPIO_R & (GPIO_PORTA_CLOCK_EN | GPIO_PORTF_CLOCK_EN)) !=
+           (GPIO_PORTA_CLOCK_EN | GPIO_PORTF_CLOCK_EN)) {
+    }
+    while ((SYSCTL_PRUART_R & UART0_CLOCK_EN) == 0) {
+    }
+    vulnerable2();
     //bar();
     return 0;
 }
