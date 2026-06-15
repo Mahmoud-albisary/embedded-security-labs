@@ -27,8 +27,11 @@
 #define GPIO_PORTA_CLOCK_EN (1U << 0)
 #define GPIO_PORTF_CLOCK_EN (1U << 5)
 #define RED_LED             (1U << 1)
+#define UART0_CLOCK_EN      (1U << 0)
 
 static void blink(void);
+static bool last_char_was_newline = false;
+
 void foo() {
     volatile uint32_t a = 0xAAAAAAAA;
     volatile uint32_t buffer[10];
