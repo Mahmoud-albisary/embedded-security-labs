@@ -75,6 +75,88 @@ static void vulnerable(void)
     __asm volatile ("nop");
 }
 
+void uart_send_char(char c) {
+    while (UART0_FR_R & (1U << 5)) {
+        // Wait until the transmit FIFO is not full
+    }
+    UART0_DR_R = c;
+}
+
+void uart_send_string(const char *message) {
+    while (*message) {
+        uart_send_char(*message++);
+    }
+}
+
+char uart_receive_char() {
+    while (UART0_FR_R & (1U << 4)) {
+        // Wait until the receive FIFO is not empty
+    }
+    return UART0_DR_R & 0xFF; // Read the received character
+}
+
+int uart_char_available(void) {
+    return (UART0_FR_R & (1U << 4)) == 0;
+}
+
+uint32_t uart_read_hex_word(void) {
+    uint32_t value = 0;
+    last_char_was_newline = false;
+    while (1) {
+        char c = uart_receive_char();
+        if (c == '\r' || c == '\n') {
+            last_char_was_newline = true;
+            break;
+        }
+        if(c == ' ') {
+            break;
+        }
+        value <<= 4;
+        if (c >= '0' && c <= '9') {
+            value |= (uint32_t)(c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            value |= (uint32_t)(c - 'a' + 10);
+        } else if (c >= 'A' && c <= 'F') {
+            value |= (uint32_t)(c - 'A' + 10);
+        }
+    }
+    return value;
+}
+
+bool uart_last_char_was_newline(void) {
+    return last_char_was_newline;
+}
+
+void vulnerable2(void) {
+    volatile uint32_t buffer[8];
+    uint32_t i = 0;
+
+    GPIO_PORTA_DIR_R = (GPIO_PORTA_DIR_R & ~(1U << 0)) | (1U << 1);
+    GPIO_PORTA_DEN_R |= (1U << 0) | (1U << 1);
+    GPIO_PORTA_PCTL_R = (GPIO_PORTA_PCTL_R & ~0xFFU) | 0x11U;
+    GPIO_PORTA_AFSEL_R |= (1U << 0) | (1U << 1);
+    GPIO_PORTA_AMSEL_R &= ~((1U << 0) | (1U << 1));
+
+    UART0_CTL_R &= ~(1U << 0); // Disable UART0 before configuration
+
+    UART0_IBRD_R = 8; // Integer part of baud rate divisor for 115200 baud
+    UART0_FBRD_R = 44;  // Fractional part of baud rate divisor for 115200 baud
+    UART0_LCRH_R = (1U << 5) | (1U << 6); // 8-bit, no parity, one stop bit
+    UART0_CC_R = 0; // Use system clock
+    UART0_CTL_R |= (1U << 0) | (1U << 8) | (1U << 9); // Enable UART, TX, and RX
+    uart_send_string("Enter 32-bit words in hex, end with newline:\r\n");
+
+    while (1) {
+        uint32_t word = uart_read_hex_word(); //payload input: "11111111 22222222 33333333 44444444 55555555 66666666 77777777 88888888 88888888 00000009 20007ff0 000002e1\r"
+        buffer[i] = word;   // normal-looking indexed input
+        i++;
+        if (uart_last_char_was_newline()) {
+            uart_send_string("NEWLINE DETECTED\r\n");
+            break;
+        }
+    }
+}
+
 static void delay(void) {
     for (volatile uint32_t i = 0; i < 1000000; i++) {
     }
