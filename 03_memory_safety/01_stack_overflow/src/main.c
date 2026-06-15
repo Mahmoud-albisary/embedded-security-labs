@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #define SYSCTL_RCGCGPIO_R   (*((volatile uint32_t *)0x400FE608))
 #define SYSCTL_RCGCUART_R   (*((volatile uint32_t *)0x400FE618))
