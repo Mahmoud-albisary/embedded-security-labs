@@ -5,17 +5,25 @@ OBJCOPY = arm-none-eabi-objcopy
 SIZE = arm-none-eabi-size
 
 CPU = cortex-m4
-CFLAGS = -mcpu=$(CPU) -mthumb -Wall -Wextra -O0 -g -ffreestanding -nostdlib
-LDFLAGS = -T linker/tm4c123gh6pm.ld -nostdlib -Wl,-Map=$(PROJECT).map
-
 SRC = src/startup.c src/main.c
 
-all: $(PROJECT).elf $(PROJECT).bin size
+COMMON_CFLAGS = -mcpu=$(CPU) -mthumb -Wall -Wextra -O0 -g3 -ffreestanding -nostdlib
+LDFLAGS = -T linker/tm4c123gh6pm.ld -nostdlib -Wl,-Map=$(PROJECT).map
 
-$(PROJECT).elf: $(SRC)
-	$(CC) $(CFLAGS) $(SRC) $(LDFLAGS) -o $@
+all: vulnerable protected
 
-$(PROJECT).bin: $(PROJECT).elf
+vulnerable: PROJECT = stack_overflow_vulnerable
+vulnerable: CFLAGS_EXTRA = -fno-stack-protector
+vulnerable: $(PROJECT)_vulnerable.elf $(PROJECT)_vulnerable.bin size
+
+protected: PROJECT = stack_overflow_protected
+protected: CFLAGS_EXTRA = -fstack-protector-all
+protected: $(PROJECT)_protected.elf $(PROJECT)_protected.bin size
+
+%.elf: $(SRC)
+	$(CC) $(COMMON_CFLAGS) $(CFLAGS_EXTRA) $(SRC) $(LDFLAGS) -o $@
+
+%.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 
 size: $(PROJECT).elf
@@ -24,4 +32,4 @@ size: $(PROJECT).elf
 clean:
 	rm -f *.elf *.bin *.map
 
-.PHONY: all clean size
+.PHONY: all vulnerable protected clean size
