@@ -32,6 +32,16 @@
 static void blink(void);
 static bool last_char_was_newline = false;
 
+uintptr_t __stack_chk_guard = 0xA5A5A5A5u;
+
+void __stack_chk_fail(void)
+{
+    while (1)
+    {
+        /* Stack smashing detected. Break here in GDB. */
+    }
+}
+
 void foo() {
     volatile uint32_t a = 0xAAAAAAAA;
     volatile uint32_t buffer[10];
