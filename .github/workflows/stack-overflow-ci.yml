@@ -1,0 +1,61 @@
+name: Stack Overflow CI
+
+on:
+  push:
+    paths:
+      - ".github/workflows/stack-overflow-ci.yml"
+      - "03_memory_safety/01_stack_overflow/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/stack-overflow-ci.yml"
+      - "03_memory_safety/01_stack_overflow/**"
+  workflow_dispatch:
+
+jobs:
+  build-stack-overflow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi \
+            gcc-arm-none-eabi \
+            make
+
+      - name: Build firmware
+        run: make clean all
+        working-directory: 03_memory_safety/01_stack_overflow
+
+      - name: Show firmware outputs
+        run: |
+          ls -lh \
+            stack_overflow_vulnerable.elf \
+            stack_overflow_vulnerable.bin \
+            stack_overflow_vulnerable.map \
+            stack_overflow_protected.elf \
+            stack_overflow_protected.bin \
+            stack_overflow_protected.map \
+            stack_overflow.elf
+        working-directory: 03_memory_safety/01_stack_overflow
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-overflow-firmware
+          path: |
+            03_memory_safety/01_stack_overflow/stack_overflow_vulnerable.elf
+            03_memory_safety/01_stack_overflow/stack_overflow_vulnerable.bin
+            03_memory_safety/01_stack_overflow/stack_overflow_vulnerable.map
+            03_memory_safety/01_stack_overflow/stack_overflow_protected.elf
+            03_memory_safety/01_stack_overflow/stack_overflow_protected.bin
+            03_memory_safety/01_stack_overflow/stack_overflow_protected.map
+            03_memory_safety/01_stack_overflow/stack_overflow.elf
+          if-no-files-found: error
+          retention-days: 7
