@@ -2,7 +2,6 @@ name: Stack Overflow CI
 
 on:
   push:
-    branches: [main]
     paths:
       - ".github/workflows/stack-overflow-ci.yml"
       - "03_memory_safety/01_stack_overflow/**"
