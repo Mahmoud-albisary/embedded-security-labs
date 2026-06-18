@@ -614,6 +614,105 @@ PC became attacker-controlled
 control flow was corrupted
 ```
 
+### `HardFault_Handler` implementation
+
+The project also includes a custom `HardFault_Handler` so that invalid control flow is easier to inspect in GDB.
+
+The startup code places `HardFault_Handler` in the vector table:
+
+```c
+(uint32_t)HardFault_Handler,    /* HardFault */
+```
+
+So when the CPU takes a HardFault, execution enters this handler instead of the default infinite loop.
+
+The handler itself is marked `naked`:
+
+```c
+__attribute__((naked, no_stack_protector))
+void HardFault_Handler(void)
+{
+    __asm volatile(
+        "tst lr, #4        \n"
+        "ite eq            \n"
+        "mrseq r0, msp     \n"
+        "mrsne r0, psp     \n"
+        "b hardfault_c     \n"
+    );
+}
+```
+
+`naked` is important because it tells the compiler not to generate a normal C function prologue or epilogue. A fault handler needs to inspect the exception stack frame exactly as the CPU created it, so the handler starts with a small hand-written assembly sequence.
+
+When a Cortex-M exception happens, the CPU automatically pushes this frame onto the active stack:
+
+```text
+stack_frame[0] = r0
+stack_frame[1] = r1
+stack_frame[2] = r2
+stack_frame[3] = r3
+stack_frame[4] = r12
+stack_frame[5] = lr
+stack_frame[6] = pc
+stack_frame[7] = xpsr
+```
+
+The assembly decides which stack pointer holds that frame:
+
+```asm
+tst lr, #4
+ite eq
+mrseq r0, msp
+mrsne r0, psp
+```
+
+Inside an exception handler, `lr` does not contain a normal return address. It contains an exception-return value. Bit 2 of that value tells whether the interrupted code was using `MSP` or `PSP`.
+
+So:
+
+```text
+if bit 2 is 0, use MSP
+if bit 2 is 1, use PSP
+```
+
+The selected stack pointer is placed in `r0`, which is the first C function argument on ARM. Then:
+
+```asm
+b hardfault_c
+```
+
+branches into the C helper:
+
+```c
+void hardfault_c(uint32_t *stack_frame)
+{
+    hardfault_stack_pointer = (uint32_t)stack_frame;
+    hardfault_r0 = stack_frame[0];
+    hardfault_r1 = stack_frame[1];
+    hardfault_r2 = stack_frame[2];
+    hardfault_r3 = stack_frame[3];
+    hardfault_r12 = stack_frame[4];
+    hardfault_lr = stack_frame[5];
+    hardfault_pc = stack_frame[6];
+    hardfault_xpsr = stack_frame[7];
+
+    while (1) {
+    }
+}
+```
+
+Those `volatile` globals preserve the fault context so GDB can inspect it after the CPU stops in the infinite loop.
+
+The most useful values are:
+
+```text
+hardfault_pc  = instruction address where the fault happened
+hardfault_lr  = LR value from the code that faulted
+hardfault_xpsr = processor status at the time of the fault
+```
+
+In this experiment, if the corrupted return address causes a real HardFault, `hardfault_pc` is the value to inspect first. It shows where the CPU tried to execute after the corrupted saved `LR` was loaded into `pc`.
+
 ---
 
 ## 10. Why this is stack smashing
